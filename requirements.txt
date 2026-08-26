@@ -1,0 +1,15 @@
+# Vision / traitement d'image
+plantcv==4.11.3
+opencv-python==4.11.0.86
+pillow==12.3.0
+numpy==2.4.6
+
+# Visualisation
+matplotlib==3.11.1
+
+# Machine learning
+tensorflow-cpu==2.21.0
+scikit-learn==1.9.0
+
+# Norme
+flake8==7.3.0

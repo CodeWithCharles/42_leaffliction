@@ -1,0 +1,21 @@
+# --- Dataset : JAMAIS dans le repo ---
+data/
+images/
+augmented_directory/
+transformed_directory/
+dst_*/
+
+# --- Environnement ---
+.venv/
+__pycache__/
+*.py[cod]
+
+# --- Artefacts d'entraînement ---
+*.zip
+*.h5
+*.keras
+*.json.gz
+
+# --- Contexte de session : versionné, sauf le PDF du sujet ---
+!.ai/
+.ai/*.pdf
