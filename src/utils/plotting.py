@@ -3,6 +3,7 @@
 import os
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 # Si pas de serveur X (VM, ou SSH), on bascule sur un
@@ -43,6 +44,34 @@ def plot_distribution(
     fig.tight_layout()
     if save_path is not None:
         fig.savefig(save_path, dpi=100)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_augmentations(
+    original: np.ndarray,
+    augmented: dict[str, np.ndarray],
+    title: str,
+    save_path: str | None = None,
+) -> None:
+    """Affiche l'original et ses augmenations sur le meme plot."""
+    total = len(augmented) + 1
+    fig, axes = plt.subplots(1, total, figsize=(3.0 * total, 3.6))
+    fig.suptitle(title, fontsize=14)
+
+    axes[0].imshow(original)
+    axes[0].set_title("Original")
+    axes[0].axis("off")
+
+    for ax, (name, img) in zip(axes[1:], augmented.items()):
+        ax.imshow(img)
+        ax.set_title(name)
+        ax.axis("off")
+
+    fig.tight_layout()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=90)
         plt.close(fig)
     else:
         plt.show()
