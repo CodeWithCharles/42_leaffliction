@@ -13,7 +13,7 @@ from utils.plotting import plot_augmentations
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Applqiue six augmentations a une image ou equilibre"
+        description="Applqiue six augmentations a une image ou equilibre "
                     "un dataset en generant les images manquantes.",
         epilog="exemples:\n"
                "  %(prog)s ./data/images/Apple_rust/'image (1).JPG'\n"
@@ -46,7 +46,7 @@ def augment_image(
     path: Path,
     dst_dir: Path,
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    """Applique les six augmentations e ecrit les fichiers resultants.
+    """Applique les six augmentations et ecrit les fichiers resultants.
     Renvoie l'image d'origine et le dict des versions augmentees."""
     img = read_image(path)
     results = {name: fn(img) for name, fn in AUGMENTATIONS.items()}
