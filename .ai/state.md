@@ -6,7 +6,13 @@
 
 - **Phase 0 — Setup** : ✅ terminée
 - **Phase 1 — `Distribution.py`** : ✅ terminée (sous réserve des 3 gestes de clôture, ci-dessous)
-- **Phase 2 — `Augmentation.py`** : ⏳ à ouvrir
+- **Phase 2 — `Augmentation.py`** : mode démo ✅ fait, mode `--balance` ⏳ non
+  implémenté (`NotImplementedError` toujours en place)
+- **Phase 3 — `Transformation.py`** : ✅ implémentée (mode image + mode
+  batch, 7 transformations dont l'histogramme couleur), `flake8` vert.
+  **Non validée visuellement sur le vrai dataset** — testée uniquement sur
+  une image synthétique (aucun dataset disponible sur cette machine durant
+  l'implémentation). Détail : `docs/part3-transformation.md`.
 
 ### Gestes de clôture Phase 1 restants
 
@@ -37,15 +43,20 @@ Versions figées : cf. D-007. Points sensibles : **plantcv 4.x** (API v4),
 ├── .flake8  requirements.txt  .gitignore
 ├── .ai/
 ├── data/images/          ← hors git
+├── docs/
+│   └── part3-transformation.md
 └── src/
     ├── Distribution.py   ✅ fait
-    ├── Augmentation.py   ⏳ coquille
-    ├── Transformation.py ⏳ coquille
+    ├── Augmentation.py   demo ✅, --balance ⏳
+    ├── Transformation.py ✅ fait (a valider sur vrai dataset)
     ├── Train.py  Predict.py  ⏳ coquilles
     └── utils/
         ├── __init__.py
         ├── dataset.py    ✅ fait
-        └── plotting.py   ✅ fait
+        ├── io_utils.py   ✅ fait
+        ├── plotting.py   ✅ fait (+ plot_transformations)
+        ├── augment.py    ✅ fait
+        └── transform.py  ✅ fait
 ```
 
 Invocation : `python src/Distribution.py ./data/images`

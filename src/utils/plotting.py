@@ -75,3 +75,44 @@ def plot_augmentations(
         plt.close(fig)
     else:
         plt.show()
+
+
+def plot_transformations(
+    original: np.ndarray,
+    images: dict[str, np.ndarray],
+    histogram: dict[str, list[float]] | None,
+    title: str,
+    save_path: str | None = None,
+) -> None:
+    """Affiche l'original, les images transformees, et l'histogramme
+    couleur (si fourni) sur une meme figure."""
+    tiles = {"Original": original, **images}
+    n_cols = min(4, len(tiles))
+    n_rows = -(-len(tiles) // n_cols)  # ceil
+    extra_row = 1 if histogram else 0
+
+    fig = plt.figure(figsize=(3.2 * n_cols, 3.6 * n_rows + 3.5 * extra_row))
+    fig.suptitle(title, fontsize=14)
+    grid = fig.add_gridspec(n_rows + extra_row, n_cols)
+
+    for i, (name, img) in enumerate(tiles.items()):
+        ax = fig.add_subplot(grid[i // n_cols, i % n_cols])
+        ax.imshow(img)
+        ax.set_title(name)
+        ax.axis("off")
+
+    if histogram:
+        ax_hist = fig.add_subplot(grid[n_rows, :])
+        colors = build_palette(list(histogram))
+        for (channel, values), color in zip(histogram.items(), colors):
+            ax_hist.plot(values, label=channel, color=color)
+        ax_hist.set_xlabel("pixel intensity")
+        ax_hist.set_ylabel("proportion of pixels (%)")
+        ax_hist.legend(fontsize=8)
+
+    fig.tight_layout()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=90)
+        plt.close(fig)
+    else:
+        plt.show()

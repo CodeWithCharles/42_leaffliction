@@ -302,3 +302,39 @@ fait que `labels`, `values` et `colors` sont construits dans le **même ordre** 
 partir de la même liste, et que `build_palette` indexe sur la **position** et non
 sur le nom. Comme `dataset.py` renvoie déjà un dict trié, la chaîne complète est
 déterministe.
+
+---
+
+## D-013 — Phase 3 : masque LAB-a/Otsu, histogramme sur index, pas d'histogramme en batch
+**Date** : 2026-09-02 · **Statut** : acté, implémenté
+
+**Session menée en implémentation directe** (mode confirmé par Charles pour
+cette session, dérogation ponctuelle au mode mentor pas-à-pas d'`AGENTS.md`).
+
+**Masque** : canal `a` de LAB (vert↔magenta) + `pcv.threshold.otsu(...,
+object_type="dark")`, puis `pcv.fill(size=200)` + `pcv.closing(kernel=5x5)`.
+C'est l'approche standard des tutoriels PlantCV pour un fond gris/blanc
+uniforme. Vérifiée fonctionnellement sur une image synthétique (ellipse verte
+sur fond gris) — **pas encore sur le vrai dataset**, absent de la machine au
+moment de l'implémentation. Cf. `.ai/next-steps.md`.
+
+**Histogramme couleur (`t_color_histogram`)** : `pcv.analyze.color(...,
+colorspaces="all")` stocke ses résultats dans `pcv.outputs.observations`,
+sous une clé `"<sample_label>_<n>"` (ex. `"default_1"`), pas sous
+`sample_label` seul — on prend `next(iter(...))` plutôt que de supposer la
+clé. Chaque canal (`blue, blue-yellow, green, green-magenta, hue, lightness,
+red, saturation, value`) est ensuite tracé contre son **indice de position**
+et non son unité physique réelle (`hue` n'a que 180 valeurs pour une plage de
+0-359°, les autres canaux en ont 256) — simplification assumée pour avoir un
+seul axe des abscisses malgré 3 unités différentes dans les données brutes.
+
+**Histogramme non sauvegardé en mode batch** : ce n'est pas une image mais
+des données à tracer, sans destination `<nom>_<Type>.JPG` naturelle. Les
+autres transformations (image → image) sont sauvegardées normalement.
+
+**Fermeture morphologique via `cv2.morphologyEx`, pas `pcv.closing`** :
+`pcv.closing` délègue à `skimage.morphology.binary_closing`, qui émet un
+`FutureWarning` (dépréciée depuis skimage 0.26, suppression prévue en 0.28).
+Remplacée par `cv2.morphologyEx(..., cv2.MORPH_CLOSE, kernel)` — même
+opération, sans dépendance à une API tierce en sursis. Vérifié : plus aucun
+`FutureWarning` levé (testé avec `-W error::FutureWarning`).

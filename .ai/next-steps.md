@@ -31,9 +31,19 @@ Deux usages du même code, dans cet ordre :
 - [ ] Deux exécutions successives → dataset identique (seed + `sorted`)
 - [ ] `flake8 .` vert
 
+## Immédiat — clôture Phase 3 (implémentée cette session)
+
+- [ ] Valider visuellement le masque (`build_mask`, canal `a` LAB + Otsu) sur
+      3-4 classes d'Apple **et** de Grape une fois `data/images/` disponible
+      — non testé sur le vrai dataset, seulement sur une image synthétique
+      (cf. `docs/part3-transformation.md`, section "Limites connues").
+- [ ] Lancer le mode batch sur ~50 images réelles (pas de crash, pas de
+      fuite mémoire) — testé seulement sur 2 images synthétiques.
+- [ ] `--balance` de `Augmentation.py` reste non implémenté
+      (`NotImplementedError`) — à faire avant de considérer la Phase 2 close.
+
 ## Plus tard
 
-- **Phase 3** — `Transformation.py`, PlantCV **v4** (D-007)
 - **Phase 4** — `train.py` + `predict.py`, avec la comparaison A/B de D-009
 - **Phase 5** — zip, `signature.txt`, soutenance
 - Question non tranchée : renommer `Train.py`/`Predict.py` en minuscules (D-010)
