@@ -338,3 +338,63 @@ autres transformations (image → image) sont sauvegardées normalement.
 Remplacée par `cv2.morphologyEx(..., cv2.MORPH_CLOSE, kernel)` — même
 opération, sans dépendance à une API tierce en sursis. Vérifié : plus aucun
 `FutureWarning` levé (testé avec `-W error::FutureWarning`).
+
+---
+
+## D-014 — Phase 4 : split avant augmentation, format du zip, choix A
+**Date** : 2026-09-03 · **Statut** : acté, implémenté
+
+**Session menée en implémentation directe** (mode confirmé par Charles pour
+cette session — même dérogation qu'en D-013 — via une demande explicite
+répétée après refus de la question de clarification sur le dataset dupliqué,
+cf. limite ci-dessous).
+
+**Split train/validation** (`utils/data_prep.py::split_dataset`) : sur les
+images **originales**, avant tout appel à `balance_classes` — jamais
+l'inverse (fuite de données sinon, cf. `.ai/roadmap.md` Phase 4, pièges).
+Graine dédiée `SPLIT_SEED = 42`, indépendante de `BALANCE_SEED` (déjà
+utilisée par la Phase 2) pour ne pas coupler les deux tirages aléatoires. Au
+moins 1 image par classe part en validation ; `Train.py` refuse de continuer
+si le total validation < 100 (`VAL_MIN_IMAGES`).
+
+**Réutilisation Phase 2** : la logique d'équilibrage de
+`Augmentation.py::balance_dataset` a été extraite vers
+`utils/augment.py::balance_classes(classes: dict, dst: Path)` — `Train.py`
+l'appelle directement sur le split train (un dict déjà en mémoire) sans
+repasser par le disque ; `Augmentation.py` devient un wrapper fin qui
+appelle `list_images` puis `balance_classes`. Aucune logique dupliquée.
+
+**Format du zip** (`utils/learnings.py`) : `model.keras` + `class_names.json`
+(ordre alphabétique, critique) + `config.json` (taille d'image, ratio de
+split, seed, description du prétraitement) + `augmented_directory/` (le
+train augmenté). `save_learnings`/`load_learnings` sont les deux seules
+fonctions qui connaissent ce format — `Predict.py` ne le reconstruit jamais
+à la main, pour éviter la divergence train/predict que le roadmap identifie
+comme le piège n°1 du projet.
+
+**Prétraitement retenu : option A** (RGB brut, redimensionné 128×128,
+normalisé `[0, 1]`) — recommandation du roadmap, à ne remettre en cause que
+si l'accuracy plafonne sous 90 % (comparaison avec l'option B, masque Phase
+3, non faite cette session — cf. D-009).
+
+**Architecture** : 3 blocs Conv2D(32→64→128)/BatchNorm/MaxPool, puis
+Flatten/Dropout(0.5)/Dense(128)/Dropout(0.3)/Dense(softmax). `Adam(1e-3)`,
+`sparse_categorical_crossentropy`, `EarlyStopping(patience=5)` +
+`ModelCheckpoint`. Point de départ du roadmap, non encore ajusté sur le vrai
+dataset.
+
+**`--evaluate` placé sur `Predict.py`**, pas `Train.py` : le roadmap (4.6)
+ne tranche pas explicitement, mais `Predict.py` a déjà toute la logique de
+chargement du zip et de prétraitement — l'y ajouter évite de dupliquer
+`load_learnings` dans les deux scripts.
+
+**Limite non résolue cette session** : `data/images/` local s'est révélé
+**dupliqué en 2×** (mêmes contenus, noms différents — vérifié par hash MD5,
+chaque classe a exactement 2× l'effectif attendu). Question posée à Charles
+(dédupliquer / ré-extraire / ignorer pour l'instant) — refusée sans réponse
+alternative, et la demande "réalise la partie 4" a été répétée telle
+quelle. Interprété comme instruction d'avancer sans bloquer davantage.
+**Le dataset n'a pas été nettoyé** : lancer `Train.py` dessus tel quel
+risque de faire atterrir un doublon des deux côtés du split train/validation
+(même piège que "augmenter avant split", cf. `docs/part4-train-predict.md`,
+section limites). Pipeline validé uniquement sur données synthétiques.

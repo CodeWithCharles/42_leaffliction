@@ -6,7 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-from utils.augment import AUGMENTATIONS
+from utils.augment import AUGMENTATIONS, balance_classes
+from utils.dataset import list_images
 from utils.io_utils import read_image, write_image
 from utils.plotting import plot_augmentations
 
@@ -55,10 +56,17 @@ def augment_image(
     return img, results
 
 
+def balance_dataset(src: Path, dst: Path) -> None:
+    """Equilibre le dataset `src` vers `dst`. Logique partagee dans
+    `utils.augment.balance_classes` (aussi utilisee par Train.py)."""
+    balance_classes(list_images(src), dst)
+
+
 def run(args: argparse.Namespace) -> None:
     """Aiguille vers le mode demo ou le mode equilibrage."""
     if args.balance:
-        raise NotImplementedError("mode equilibrage - etape 2.3")
+        balance_dataset(Path(args.balance), Path(args.dst))
+        return
 
     path = Path(args.image)
     original, augmented = augment_image(path, Path.cwd())
@@ -68,9 +76,6 @@ def run(args: argparse.Namespace) -> None:
 def main() -> int:
     try:
         run(parse_args())
-    except NotImplementedError as exc:
-        print(f"Non implémenté: {exc}", file=sys.stderr)
-        return 1
     except (OSError, ValueError) as exc:
         print(f"Erreur: {exc}", file=sys.stderr)
         return 1

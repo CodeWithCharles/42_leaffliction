@@ -4,6 +4,7 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import confusion_matrix as sk_confusion_matrix
 
 
 # Si pas de serveur X (VM, ou SSH), on bascule sur un
@@ -72,6 +73,67 @@ def plot_augmentations(
     fig.tight_layout()
     if save_path is not None:
         fig.savefig(save_path, dpi=90)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_prediction(
+    original: np.ndarray,
+    preprocessed: np.ndarray,
+    predicted_class: str,
+    confidence: float,
+    save_path: str | None = None,
+) -> None:
+    """Affiche l'image originale et sa version pretraitee (celle
+    consommee par le modele), avec la classe predite en titre."""
+    fig, (ax_orig, ax_prep) = plt.subplots(1, 2, figsize=(8, 4.5))
+    fig.suptitle(
+        f"{predicted_class}  ({confidence:.1%})", fontsize=14)
+
+    ax_orig.imshow(original)
+    ax_orig.set_title("Original")
+    ax_orig.axis("off")
+
+    ax_prep.imshow(preprocessed)
+    ax_prep.set_title("Pretraitee (entree du modele)")
+    ax_prep.axis("off")
+
+    fig.tight_layout()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=100)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_confusion_matrix(
+    y_true: list[int],
+    y_pred: list[int],
+    class_names: list[str],
+    save_path: str | None = None,
+) -> None:
+    """Matrice de confusion normalisee par ligne (rappel par classe)."""
+    matrix = sk_confusion_matrix(
+        y_true, y_pred, labels=range(len(class_names)))
+    normalized = matrix / matrix.sum(axis=1, keepdims=True).clip(min=1)
+
+    fig, ax = plt.subplots(figsize=(1.0 * len(class_names) + 2, 8))
+    im = ax.imshow(normalized, cmap="Blues", vmin=0, vmax=1)
+    ax.set_xticks(range(len(class_names)))
+    ax.set_yticks(range(len(class_names)))
+    ax.set_xticklabels(class_names, rotation=45, ha="right")
+    ax.set_yticklabels(class_names)
+    ax.set_xlabel("predit")
+    ax.set_ylabel("reel")
+    for i in range(len(class_names)):
+        for j in range(len(class_names)):
+            ax.text(j, i, matrix[i, j], ha="center", va="center",
+                    color="white" if normalized[i, j] > 0.5 else "black")
+    fig.colorbar(im, ax=ax, label="rappel")
+    fig.tight_layout()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=100)
         plt.close(fig)
     else:
         plt.show()

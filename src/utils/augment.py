@@ -1,9 +1,14 @@
 """Six augmentations deterministes, à taille d'image constante."""
 
+import random
+import shutil
+from pathlib import Path
 from typing import Callable
 
 import cv2
 import numpy as np
+
+from utils.io_utils import read_image, write_image
 
 
 # Parametres fixes
@@ -83,3 +88,46 @@ AUGMENTATIONS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
     "Crop": crop,
     "Distortion": distortion,
 }
+
+BALANCE_SEED = 42
+
+
+def balance_classes(classes: dict[str, list[Path]], dst: Path) -> None:
+    """Copie chaque classe vers `dst`, puis genere des images augmentees
+    pour amener chaque classe deficitaire au niveau de la classe
+    majoritaire (jamais l'inverse : la majoritaire n'est jamais
+    augmentee, sinon on ne converge jamais).
+
+    Selection deterministe : toutes les paires (image, augmentation)
+    possibles sont enumerees, melangees avec une graine fixe, et les
+    premieres sont retenues - jamais de tirage avec remise (cf.
+    .ai/decisions.md, D-006). Utilisee par `Augmentation.py --balance`
+    et par `Train.py` (uniquement sur le split train, jamais sur la
+    validation - cf. .ai/decisions.md, split avant augmentation)."""
+    target = max(len(paths) for paths in classes.values())
+    random.seed(BALANCE_SEED)
+
+    for class_name, paths in classes.items():
+        class_dst = dst / class_name
+        class_dst.mkdir(parents=True, exist_ok=True)
+        for path in paths:
+            shutil.copy2(path, class_dst / path.name)
+
+        deficit = target - len(paths)
+        if deficit <= 0:
+            continue
+
+        pairs = [(path, name) for path in paths for name in AUGMENTATIONS]
+        if deficit > len(pairs):
+            raise ValueError(
+                f"'{class_name}': {deficit} images a generer pour "
+                f"seulement {len(pairs)} paires (image, augmentation) "
+                "possibles"
+            )
+        random.shuffle(pairs)
+
+        for index, (path, aug_name) in enumerate(pairs[:deficit]):
+            img = read_image(path)
+            out = AUGMENTATIONS[aug_name](img)
+            out_name = f"{path.stem}_{aug_name}_{index}{path.suffix}"
+            write_image(class_dst / out_name, out)

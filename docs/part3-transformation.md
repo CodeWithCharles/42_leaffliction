@@ -9,7 +9,7 @@ v4.11.3 (sujet IV.3, p.7-8). Historique de la decision et pieges connus :
 ```bash
 # Une image -> affiche les transformations (fenetre, ou fichier via matplotlib
 # si aucun $DISPLAY)
-python src/Transformation.py ./data/images/Apple_healthy/image1.JPG
+python "src/Transformation.py ./data/images/Apple_healthy/image (1).JPG"
 
 # Un dossier -> sauvegarde les transformations, arborescence des classes
 # reproduite sous -dst

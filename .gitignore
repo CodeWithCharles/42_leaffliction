@@ -4,6 +4,8 @@ images/
 augmented_directory/
 transformed_directory/
 dst_*/
+train_workdir/
+validation_directory/
 
 # --- Environnement ---
 .venv/
