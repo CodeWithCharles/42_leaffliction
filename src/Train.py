@@ -7,6 +7,7 @@ import shutil
 import sys
 from pathlib import Path
 
+import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
@@ -130,11 +131,18 @@ def run(args: argparse.Namespace) -> None:
         val_dir, class_names, args.batch_size, shuffle=False)
 
     model = build_cnn((*IMG_SIZE, 3), len(class_names))
+    # Les deux callbacks surveillent `val_accuracy`, pas la `val_loss`
+    # par defaut : le critere du sujet est l'accuracy, et avec BatchNorm
+    # la val_loss remonte (reseau sur-confiant) pendant que l'accuracy
+    # progresse encore - surveiller la loss arrete l'entrainement trop
+    # tot. `mode="max"` car ici plus haut = meilleur.
     callbacks = [
         keras.callbacks.EarlyStopping(
-            patience=5, restore_best_weights=True),
+            monitor="val_accuracy", mode="max",
+            patience=8, restore_best_weights=True),
         keras.callbacks.ModelCheckpoint(
-            str(work_dir / "best.keras"), save_best_only=True),
+            str(work_dir / "best.keras"), monitor="val_accuracy",
+            mode="max", save_best_only=True),
     ]
 
     history = model.fit(
@@ -145,8 +153,13 @@ def run(args: argparse.Namespace) -> None:
         shuffle=False,  # deja fait par image_dataset_from_directory
     )
 
-    val_accuracy = history.history["val_accuracy"][-1]
-    print(f"accuracy de validation (derniere epoque): {val_accuracy:.4f}")
+    # `restore_best_weights=True` rend les poids de la MEILLEURE epoque :
+    # afficher la derniere decrirait un modele different de celui livre.
+    best_epoch = int(np.argmax(history.history["val_accuracy"]))
+    best_accuracy = history.history["val_accuracy"][best_epoch]
+    print(f"accuracy de validation (meilleure epoque, "
+          f"{best_epoch + 1}/{len(history.history['val_accuracy'])}): "
+          f"{best_accuracy:.4f}")
 
     config = {
         "img_size": list(IMG_SIZE),

@@ -398,3 +398,145 @@ quelle. Interprété comme instruction d'avancer sans bloquer davantage.
 risque de faire atterrir un doublon des deux côtés du split train/validation
 (même piège que "augmenter avant split", cf. `docs/part4-train-predict.md`,
 section limites). Pipeline validé uniquement sur données synthétiques.
+
+---
+
+## D-015 — Validation sur le vrai dataset : les 3 premières phases passent, le modèle est sous-entraîné
+**Date** : 2026-09-23 · **Statut** : acté
+
+Première session où **tout tourne sur le vrai `data/images/`** (7221 images,
+8 classes). Les limites de D-013 et D-014 (validation uniquement sur données
+synthétiques) sont donc levées, sauf mention contraire ci-dessous.
+
+**Le dataset dupliqué en 2× signalé en D-014 n'existe plus.** Recomptage :
+chaque classe est à son effectif nominal (Apple_rust 275, Apple_healthy 1640,
+etc.). Le blocage « dédupliquer avant tout entraînement » est caduc — il ne
+reste rien à nettoyer.
+
+**Phase 2 validée** : `Augmentation.py --balance data/images --dst
+augmented_directory` produit 13 120 images, **1640 par classe exactement**.
+`Distribution.py augmented_directory` montre 8 barres strictement égales et
+un camembert à 12,5 % partout. C'est le critère de sortie Phase 2 du
+roadmap, prouvé sur le vrai dataset.
+
+**Phase 3 validée** : mode batch sur 24 images réelles (3 par classe, les 8
+classes) → 120 fichiers, aucun crash, 2,5 s. Masques contrôlés visuellement
+sur Apple **et** Grape, y compris `Grape_Esca` dont les feuilles sont
+trouées : fond supprimé proprement, contours et taches de maladie préservés.
+Le pipeline LAB-a/Otsu de D-013 tient sur le vrai dataset.
+
+**Phase 4 — le modèle ne passe pas le critère du sujet** :
+
+| mesure | valeur |
+|---|---|
+| accuracy validation (1444 images) | **85,73 %** |
+| accuracy train (échantillon 800) | 87,88 % |
+| exigence du sujet | > 90 % |
+
+**Diagnostic : sous-apprentissage, pas sur-apprentissage.** L'écart
+train/validation n'est que de ~2 points — le modèle n'a pas encore appris
+ses propres données d'entraînement. Confirmé par les confusions observées
+dans la matrice : `Grape_spot` → `Apple_rust` (19), `Grape_Black_rot` →
+`Apple_healthy` (15). Des confusions **entre plantes différentes**, dont la
+forme de feuille n'a rien de commun — signature d'un réseau qui n'a pas
+convergé, pas d'une maladie intrinsèquement ambiguë.
+
+**Conséquence sur D-009 / l'option B** : la comparaison A/B (RGB brut vs
+image masquée) prévue « si l'accuracy plafonne sous 90 % » **ne doit pas
+être lancée ici**. Le masquage attaque le bruit de fond, donc le
+sur-apprentissage ; il ne corrige pas un modèle qui sous-apprend. L'option A
+reste retenue.
+
+**Cause retenue** : entraînement arrêté trop tôt. Les images augmentées du
+zip livré datent de 11:50 et le zip de 12:18, soit ~20 min de training à
+~4,5 min/époque → environ 4 époques. Insuffisant pour un CNN from scratch
+sur 10 496 images.
+
+**Correction apportée à `Train.py`** : `EarlyStopping` et `ModelCheckpoint`
+surveillaient `val_loss` (le défaut Keras) alors que le critère du sujet est
+l'accuracy. Avec BatchNorm, la `val_loss` remonte quand le réseau devient
+sur-confiant, pendant que la `val_accuracy` progresse encore : surveiller la
+loss coupe l'entraînement alors que le modèle s'améliore toujours. Passés à
+`monitor="val_accuracy", mode="max"`, patience 5 → 8.
+
+Second correctif : `run()` affichait `val_accuracy[-1]` (dernière époque)
+alors que `restore_best_weights=True` livre les poids de la **meilleure**
+époque — le chiffre annoncé ne décrivait pas le modèle sauvegardé. Affiche
+désormais la meilleure époque et son rang.
+
+**Incident** : `train_workdir/` a été supprimé par erreur pendant cette
+session (un `rm -rf` avant relance d'entraînement), alors qu'il contenait le
+set de validation du modèle livré — absent du zip par conception. Sans
+conséquence : `split_dataset` est déterministe (`SPLIT_SEED = 42`), donc
+régénérer le split sur le même `data/images` reproduit exactement les mêmes
+1444 images. Vérifié : le train régénéré compte 10 496 images, exactement le
+nombre d'images augmentées présentes dans le zip livré. **C'est précisément
+ce que le déterminisme du split achète** — argument à resservir en
+soutenance.
+
+**Non tranché** : `evaluate()` (`Predict.py`) ne passe jamais `save_path` à
+`plot_confusion_matrix`, qui le supporte pourtant. Sans `$DISPLAY`, la
+matrice n'est donc pas récupérable en fichier. Sans effet en soutenance sur
+une machine avec écran, mais un `--save` serait utile pour archiver la
+preuve du > 90 %.
+
+---
+
+## D-016 — Phase 4 franchie (93,98 %) et Phase 5 : zip figé, `signature.txt` générée
+**Date** : 2026-09-23 · **Statut** : acté
+
+Suite directe de D-015 : le correctif `monitor="val_accuracy"` est validé.
+
+**Résultat du ré-entraînement** : meilleure époque **9 sur 17**
+(`EarlyStopping` a coupé à 17 après 8 époques sans progrès), val_accuracy
+0,9370 côté Keras, **0,9398 mesurée indépendamment** par
+`Predict.py --evaluate` sur les 1444 images de validation.
+
+| | v1 (12:18) | v2 (livré) |
+|---|---|---|
+| accuracy validation | 85,73 % | **93,98 %** |
+| meilleure époque | ~4 (estimé) | 9 / 17 |
+
+**Le correctif a bien traité la cause.** Les confusions entre plantes
+différentes ont disparu : `Grape_spot` → `Apple_rust` passe de 19 à **0**,
+`Grape_Black_rot` → `Apple_healthy` de 15 à 2. Il ne reste que des
+confusions **intra-plante** botaniquement plausibles, la pire classe étant
+`Apple_scab` à 81,7 % de rappel (confondue avec `Apple_Black_rot` 12 fois et
+`Apple_healthy` 10 fois — deux affections du même pommier).
+
+**La `val_accuracy` est très bruitée d'une époque à l'autre** (0,51 → 0,88 →
+0,59 → 0,75 → 0,94…). C'est exactement ce qui rendait la surveillance de la
+`val_loss` dangereuse, et ça justifie la patience portée à 8 : avec patience
+5 sur une courbe aussi instable, l'arrêt tombe sur un creux. À savoir
+expliquer en soutenance si la question vient.
+
+**Absence de fuite train/validation prouvée empiriquement**, pas seulement
+par lecture du code : extraction des 10 496 chemins `classe/fichier` du zip
+et des 1444 du set de validation → **intersection vide**. Les entrées de
+validation ne portent d'ailleurs aucun suffixe `_Flip_` / `_Rotate_`, donc
+elles n'ont jamais été augmentées. Attention au piège de lecture : les noms
+de fichiers se répètent d'une classe à l'autre (`image (103).JPG` existe
+dans presque toutes), donc la comparaison **doit** porter sur
+`classe/fichier` et non sur le seul nom de fichier.
+
+**Autosuffisance du zip vérifiée** : zip copié hors du repo + image hors du
+repo → `Predict.py` prédit correctement `Grape_Esca` à 100 %.
+
+**Phase 5 — zip figé** : `learnings_v2.zip` renommé en `learnings.zip`
+(l'ancien modèle à 85,73 %, qui échouait au critère du sujet, est écrasé —
+bascule autorisée par Charles sous condition des 90 %, condition remplie).
+
+```
+sha1 : e1a6e28e5dbe5d32659ad461a6c217840d42bcef
+taille : 277 006 992 octets
+```
+
+> ⛔ **Ne plus jamais régénérer ce zip.** Relancer `Train.py` produit un
+> fichier au hash différent (horodatages de compression + poids ré-entraînés)
+> et invalide `signature.txt` → note 0. Si un ré-entraînement devient
+> nécessaire, il faut **regénérer `signature.txt` dans la foulée** et
+> recommiter.
+
+Vérifié après coup que `Predict.py --evaluate` (qui décompresse le zip dans
+un répertoire temporaire puis le supprime) **ne modifie pas** l'archive :
+`sha1sum -c signature.txt` repasse OK après une évaluation complète.
